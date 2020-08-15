@@ -1,0 +1,7 @@
+import(stdio.h)
+if(x = y) then
+	print(x=y);
+else
+	print(not eq);
+
+3+2=5;

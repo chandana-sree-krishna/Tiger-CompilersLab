@@ -1,0 +1,137 @@
+%%
+
+%eop EOF
+%verbose
+%pure
+
+%name Expr
+
+(* The terminals or tokens of the language *)
+%term NIL | BREAK
+		| CONST of int
+		| COMMENT of string
+		| STRING of string
+		| ID of string
+		| COMMA | COLON	| SEMICOLON	| DOT
+		| LP	| RP	| LSB	| RSB	| LFB	| RFB
+		| PLUS	| MINUS	| MUL	| DIV
+		| EQ	| NEQ | GT | LT | LE | GE
+		| AND | OR | ASSIGN
+		| IF | THEN | ELSE | WHILE | DO | FOR | TO | LET | IN | END | OF
+		| EOF
+		| ARRAY
+		| FUNCTION
+		| TYPE
+		| VAR
+		| UNARY
+
+
+		
+(* The nonterminals of the language *)
+%nonterm PROGRAM 								of Ast.Program
+			 | EXP 										of Ast.Exp
+			 | EXPS 									of Ast.Exp list
+			 | EXPC 									of Ast.Exp list
+			 | LVALUE 						  	of Ast.Lvalue
+			 | RECORDFIELDDEC         of (string * Ast.Exp) list
+       | RECORDFIELDCREATE      of (string * string) list
+       | DEC                    of Ast.Dec
+       | DECS                   of Ast.Dec list
+       | TYPEDEC                of Ast.TypeDec
+       | FUNDEC                 of Ast.FunDec
+       | VARDEC                 of Ast.VarDec
+       | BINOP               		of Ast.BinOp
+			 
+
+%noshift EOF			(* non-shiftable terminals *)
+%nonassoc WHILE IF FOR
+%left OR
+%left AND
+%nonassoc GE LE EQ NEQ LT GT
+%left PLUS MINUS
+%left MUL DIV
+%left ASSIGN
+%left UNARY 
+
+%pos int
+
+%%
+
+PROGRAM : EXP   			 			( [EXP] )
+				| EXP PROGRAM				(EXP :: PROGRAM)
+
+	 
+EXP : NIL																				(Ast.Nil)
+		| CONST   																	(Ast.Const CONST)
+		| STRING        														(Ast.Str STRING)	
+		| LVALUE																		(Ast.Lval LVALUE)
+		| LP EXPS RP     			 											(Ast.Exps EXPS)
+		| ID LP EXPC RP															(Ast.FunCall (ID, EXPC))
+		| EXP PLUS EXP                                      ( Ast.plus EXP1 EXP2)
+		| EXP MINUS EXP                                      ( Ast.minus EXP1 EXP2)
+    | EXP MUL EXP                                      ( Ast.mul EXP1 EXP2)
+    | EXP DIV EXP                                      ( Ast.divi EXP1 EXP2)
+    | EXP GE EXP                                     ( Ast.ge EXP1 EXP2)
+    | EXP LE EXP                                      ( Ast.le EXP1 EXP2)
+    | EXP EQ EXP                                      ( Ast.equal EXP1 EXP2)
+    | EXP NEQ EXP                                      ( Ast.notEq EXP1 EXP2)
+    | EXP LT EXP                                      ( Ast.lesser EXP1 EXP2)
+    | EXP GT EXP                                      ( Ast.greater EXP1 EXP2)
+    | EXP AND EXP                                      ( Ast.andOp EXP1 EXP2)
+    | EXP OR EXP                                      ( Ast.orOp EXP1 EXP2)		
+		| ID LSB EXP RSB OF EXP %prec WHILE  										(Ast.Array (ID, EXP1, EXP2))
+    | ID LFB RECORDFIELDDEC RFB     							(Ast.Record (ID, RECORDFIELDDEC))
+    | LVALUE ASSIGN EXP           							(Ast.Assign (LVALUE, EXP)) 
+		| IF EXP THEN EXP ELSE EXP %prec IF					(Ast.IfThenElse(EXP1, EXP2, EXP3))
+		| IF EXP THEN EXP %prec IF 									(Ast.IfThen(EXP1, EXP2))
+		| WHILE EXP DO EXP %prec WHILE 							(Ast.While (EXP1,EXP2))
+		| FOR ID ASSIGN EXP TO EXP DO EXP	%prec FOR (Ast.For (ID,EXP1,EXP2,EXP3))
+		| LET DECS IN EXPS END                      ( Ast.Let (DECS, EXPS) ) 
+		| COMMENT																		(Ast.Comment COMMENT)
+		| BREAK 																		(Ast.Break)
+		| UNARY EXP																	(Ast.Negation EXP)
+		
+ 
+EXPS : (* empty *)          ([])
+		 | EXP  								([EXP])
+		 | EXP SEMICOLON EXPS   (EXP :: EXPS)
+		 
+
+EXPC    : EXP                                       ( [EXP] )
+        | EXP COMMA EXPS                            ( EXP :: EXPS )
+
+
+LVALUE  : ID                                        ( Ast.Id ID )
+        | LVALUE LSB EXP RSB							            ( Ast.Subscript (LVALUE, EXP) )
+        | LVALUE DOT ID                             ( Ast.Field (LVALUE, ID) )
+
+RECORDFIELDDEC
+        : ID EQ EXP                             ( [(ID, EXP)] )
+        | ID EQ EXP COMMA RECORDFIELDDEC        ( (ID, EXP) :: RECORDFIELDDEC )
+
+DECS    : DEC                                       ( [DEC] )
+        | DEC DECS                                  ( DEC :: DECS )
+
+DEC     : TYPEDEC                                   ( Ast.TyDec TYPEDEC )
+        | VARDEC                                    ( Ast.VDec VARDEC )
+        | FUNDEC                                    ( Ast.FDec FUNDEC )
+
+TYPEDEC : TYPE ID EQ ID                         ( Ast.TypeAssign (ID1, ID2) )
+        | TYPE ID EQ ARRAY OF ID                ( Ast.ArrayType (ID1, ID2) )
+        | TYPE ID EQ LFB                    
+          RECORDFIELDCREATE RFB                 ( Ast.RecordType (ID, RECORDFIELDCREATE) )
+
+RECORDFIELDCREATE 
+        : ID COLON ID                           ( [(ID1, ID2)] )
+        | ID COLON ID COMMA RECORDFIELDCREATE   ( (ID1, ID2) :: RECORDFIELDCREATE )
+
+FUNDEC  : FUNCTION ID LP RECORDFIELDCREATE      
+          RP EQ EXP                         ( Ast.Fun (ID, RECORDFIELDCREATE, EXP) )
+        | FUNCTION ID LP RP EQ EXP      ( Ast.Fun (ID, [], EXP) )
+        | FUNCTION ID LP RECORDFIELDCREATE 
+          RP COLON ID EQ EXP                ( Ast.FunType (ID1, RECORDFIELDCREATE, ID2, EXP) )
+        | FUNCTION ID LP RP COLON ID        
+          EQ EXP                                ( Ast.FunType (ID1, [], ID2, EXP) )
+
+VARDEC  : VAR ID ASSIGN EXP                         ( Ast.Var (ID, EXP) )
+        | VAR ID COLON ID ASSIGN EXP                ( Ast.VarType (ID1, ID2, EXP) )

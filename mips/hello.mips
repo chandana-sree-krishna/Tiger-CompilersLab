@@ -1,0 +1,14 @@
+			.data
+mesg: .asciiz "Hello world\n"
+			.text
+			.globl	main
+			
+main:
+
+		#Printing
+		la $a0, mesg		#argument for print_str
+		li $v0, 4				# cade for print_str
+		syscall					# Make a system call
+		
+		li $v0, 10			#Code for exit
+		syscall					#Exit system call

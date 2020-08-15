@@ -1,0 +1,46 @@
+%%
+
+%eof EOF
+%verbose
+%pure
+
+%name Expr
+
+(* The terminals or tokens of the language *)
+%term CONST of int
+		| PLUS
+		| MINUS
+		| MUL
+		| DIV
+		| LP
+		| RP
+		| EOF
+		| NEWLINE
+		
+(* The nonterminals of the language *)
+%nonterm EXP of Ast.exp
+			 | EXPS of Ast.exp list
+			 | PROGRAM of Ast.exp list
+			 
+%noshift EOF
+			 
+%left PLUS MINUS
+%left MUL DIV
+
+%pos int
+
+%%
+
+PROGRAM : EXPS   			 (EXPS)
+				| EXPS NEWLINE (EXPS)
+
+EXPS : (* empty *)           ([] )
+	 | EXP NEWLINE EXPS  (EXP :: EXPS)
+	 
+EXP : CONST   			(Ast.Const CONST)
+		| EXP PLUS EXP  (Ast.plus EXP1 EXP2)
+		| EXP MINUS EXP (Ast.minus EXP1 EXP2)
+		| EXP MUL EXP   (Ast.mul EXP1 EXP2)
+		| EXP DIV EXP   (Ast.div EXP1 EXP2)
+		| LP EXP RP     (EXP)
+ 
